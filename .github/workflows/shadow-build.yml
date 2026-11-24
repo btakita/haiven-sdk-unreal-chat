@@ -28,6 +28,7 @@ jobs:
       && vars.SDK_SHADOW_DISPATCH_ACTOR_ID != '' && github.actor_id == vars.SDK_SHADOW_DISPATCH_ACTOR_ID
     runs-on: ubuntu-24.04
     outputs:
+      environment: ${{ steps.plan.outputs.environment }}
       base_sha: ${{ steps.plan.outputs.base_sha }}
       request_id: ${{ steps.plan.outputs.request_id }}
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -67,7 +68,9 @@ jobs:
     # already holds Unreal Engine 5.8.2 and exports UNREAL_ENGINE_ROOT.
     name: Shadow build / ${{ matrix.platform }}
     needs: request
-    environment: shadow-source
+    # shadow-source for main stages, shadow-source-pr for pull-request stages:
+    # each holds its own source key, so unmerged code never runs beside main's.
+    environment: ${{ needs.request.outputs.environment }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.request.outputs.matrix) }}
@@ -114,7 +117,7 @@ jobs:
         shell: bash
         run: |
           [[ "$IMAGE" =~ ^ghcr\.io/epicgames/unreal-engine:dev-slim-[0-9.]+@sha256:[0-9a-f]{64}$ ]]
-          [[ -n "$EPIC_GHCR_TOKEN" ]] || { echo "Set EPIC_GHCR_TOKEN in the shadow-source environment." >&2; exit 1; }
+          [[ -n "$EPIC_GHCR_TOKEN" ]] || { echo "Set EPIC_GHCR_TOKEN in this run's shadow-source or shadow-source-pr environment." >&2; exit 1; }
           # The engine does not fit beside the preinstalled toolchains on the root disk.
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
           engine=/mnt/unreal-engine
